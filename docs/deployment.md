@@ -23,11 +23,18 @@ runs per day, not for a droplet sitting idle 24/7.
    ```
    fly volumes create opticlone_state --app opticlone-job --region sin --size 1
    ```
-4. Set `OPENAI_API_KEY` as a Fly secret if you ever want to pass one (leave
-   unset for this build — the stub uploader needs none):
+4. Set the three OpenAI secrets so the job uses the real
+   `OpenAIVectorStoreUploader` instead of the stub. Leave all three unset to
+   keep using the stub (e.g. for a dry run):
    ```
-   fly secrets set OPENAI_API_KEY=... --app opticlone-job
+   fly secrets set OPENAI_API_KEY=sk-... --app opticlone-job
+   fly secrets set OPENAI_ASSISTANT_ID=asst_1C5Q789Hqdbzv9nJsij2DDaI --app opticlone-job
+   fly secrets set OPENAI_VECTOR_STORE_ID=vs_... --app opticlone-job
    ```
+   `OPENAI_VECTOR_STORE_ID` should be set only *after* a first successful run
+   has created one and logged its id (see the README's "Verifying the real
+   uploader" section) — leaving it unset on the very first run is expected
+   and correct; the uploader creates the store itself.
 5. Build and push the image (build-only — do **not** use plain `fly deploy`
    here, see the note below):
    ```
