@@ -113,3 +113,37 @@ def test_upload_updated_article_continues_if_old_file_already_gone(tmp_path):
     client.vector_stores.files.delete.assert_called_once_with("file_old1", vector_store_id="vs_existing")
     client.files.delete.assert_called_once_with("file_old1")
     client.vector_stores.files.upload_and_poll.assert_called_once()
+
+
+def test_upload_skips_recording_id_when_status_failed(tmp_path):
+    client = make_mock_client()
+    client.vector_stores.files.upload_and_poll.return_value = MagicMock(
+        id="file_x", status="failed", last_error=MagicMock(message="embedding failed")
+    )
+    uploader = OpenAIVectorStoreUploader(
+        api_key="sk-test", assistant_id="asst_test", vector_store_id="vs_existing", client=client
+    )
+    files = [make_article_file(tmp_path)]
+
+    result = uploader.upload(files)
+
+    assert result == {}
+    client.vector_stores.files.content.assert_not_called()
+
+
+def test_upload_continues_processing_remaining_files_after_one_fails(tmp_path):
+    client = make_mock_client()
+    failed = MagicMock(id="file_fail", status="failed", last_error=MagicMock(message="boom"))
+    ok = MagicMock(id="file_ok", status="completed", last_error=None)
+    client.vector_stores.files.upload_and_poll.side_effect = [failed, ok]
+    uploader = OpenAIVectorStoreUploader(
+        api_key="sk-test", assistant_id="asst_test", vector_store_id="vs_existing", client=client
+    )
+    files = [
+        make_article_file(tmp_path, article_id=1, slug="one"),
+        make_article_file(tmp_path, article_id=2, slug="two"),
+    ]
+
+    result = uploader.upload(files)
+
+    assert result == {2: "file_ok"}

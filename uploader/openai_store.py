@@ -72,6 +72,13 @@ class OpenAIVectorStoreUploader(Uploader):
                     vector_store_id=vector_store_id, file=fh
                 )
 
+            if vsf.status != "completed":
+                logger.error(
+                    "Upload failed for article_id=%s slug=%s status=%s last_error=%s",
+                    file.article_id, file.slug, vsf.status, vsf.last_error,
+                )
+                continue
+
             uploaded[file.article_id] = vsf.id
             files_embedded += 1
             chunks_embedded += len(
