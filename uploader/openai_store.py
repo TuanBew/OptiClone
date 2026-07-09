@@ -49,6 +49,24 @@ class OpenAIVectorStoreUploader(Uploader):
         chunks_embedded = 0
 
         for file in files:
+            if file.file_id:
+                try:
+                    self.client.vector_stores.files.delete(
+                        file.file_id, vector_store_id=vector_store_id
+                    )
+                except Exception:
+                    logger.warning(
+                        "Could not detach old vector-store file id=%s for article_id=%s "
+                        "(already gone?)", file.file_id, file.article_id, exc_info=True,
+                    )
+                try:
+                    self.client.files.delete(file.file_id)
+                except Exception:
+                    logger.warning(
+                        "Could not delete old File object id=%s for article_id=%s "
+                        "(already gone?)", file.file_id, file.article_id, exc_info=True,
+                    )
+
             with open(file.path, "rb") as fh:
                 vsf = self.client.vector_stores.files.upload_and_poll(
                     vector_store_id=vector_store_id, file=fh

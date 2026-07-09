@@ -75,3 +75,39 @@ def test_upload_empty_list_makes_no_client_calls():
     client.vector_stores.create.assert_not_called()
     client.beta.assistants.update.assert_not_called()
     client.vector_stores.files.upload_and_poll.assert_not_called()
+
+
+def test_upload_updated_article_deletes_old_file_before_uploading_new(tmp_path):
+    client = make_mock_client()
+    call_order = []
+    client.vector_stores.files.delete.side_effect = lambda *a, **k: call_order.append("delete_vsf")
+    client.files.delete.side_effect = lambda *a, **k: call_order.append("delete_file")
+    client.vector_stores.files.upload_and_poll.side_effect = (
+        lambda *a, **k: call_order.append("upload") or MagicMock(id="file_new1", status="completed", last_error=None)
+    )
+    uploader = OpenAIVectorStoreUploader(
+        api_key="sk-test", assistant_id="asst_test", vector_store_id="vs_existing", client=client
+    )
+    files = [make_article_file(tmp_path, file_id="file_old1")]
+
+    result = uploader.upload(files)
+
+    assert result == {1: "file_new1"}
+    client.vector_stores.files.delete.assert_called_once_with("file_old1", vector_store_id="vs_existing")
+    client.files.delete.assert_called_once_with("file_old1")
+    assert call_order == ["delete_vsf", "delete_file", "upload"]
+
+
+def test_upload_updated_article_continues_if_old_file_already_gone(tmp_path):
+    client = make_mock_client()
+    client.vector_stores.files.delete.side_effect = Exception("404 not found")
+    client.files.delete.side_effect = Exception("404 not found")
+    uploader = OpenAIVectorStoreUploader(
+        api_key="sk-test", assistant_id="asst_test", vector_store_id="vs_existing", client=client
+    )
+    files = [make_article_file(tmp_path, file_id="file_old1")]
+
+    result = uploader.upload(files)
+
+    assert result == {1: "file_new1"}
+    client.vector_stores.files.upload_and_poll.assert_called_once()
