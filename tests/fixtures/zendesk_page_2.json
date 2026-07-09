@@ -1,0 +1,22 @@
+{
+  "articles": [
+    {
+      "id": 3,
+      "title": "Article Three",
+      "name": "Article Three",
+      "body": "<h2>Sub</h2><pre><code>print('hi')</code></pre>",
+      "html_url": "https://support.optisigns.com/hc/en-us/articles/3-article-three",
+      "section_id": 100,
+      "locale": "en-us",
+      "draft": false,
+      "created_at": "2025-01-03T00:00:00Z",
+      "updated_at": "2025-01-04T00:00:00Z",
+      "edited_at": "2025-01-04T00:00:00Z",
+      "label_names": []
+    }
+  ],
+  "count": 3,
+  "page": 2,
+  "page_count": 2,
+  "next_page": null
+}

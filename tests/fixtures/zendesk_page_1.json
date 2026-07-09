@@ -1,0 +1,36 @@
+{
+  "articles": [
+    {
+      "id": 1,
+      "title": "Article One",
+      "name": "Article One",
+      "body": "<h1>Heading</h1><p>Body text with <a href=\"/hc/en-us/articles/2-two\">a link</a>.</p>",
+      "html_url": "https://support.optisigns.com/hc/en-us/articles/1-article-one",
+      "section_id": 100,
+      "locale": "en-us",
+      "draft": false,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-02T00:00:00Z",
+      "edited_at": "2025-01-02T00:00:00Z",
+      "label_names": []
+    },
+    {
+      "id": 2,
+      "title": "Draft Article",
+      "name": "Draft Article",
+      "body": "<p>Should be excluded</p>",
+      "html_url": "https://support.optisigns.com/hc/en-us/articles/2-draft-article",
+      "section_id": 100,
+      "locale": "en-us",
+      "draft": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-02T00:00:00Z",
+      "edited_at": "2025-01-02T00:00:00Z",
+      "label_names": []
+    }
+  ],
+  "count": 3,
+  "page": 1,
+  "page_count": 2,
+  "next_page": "https://support.optisigns.com/api/v2/help_center/en-us/articles.json?per_page=100&page=2"
+}
