@@ -84,6 +84,36 @@ docker run --rm --env-file .env -v $(pwd)/state:/app/state -v $(pwd)/logs:/app/l
 Exits 0 with or without `OPENAI_API_KEY` set. When set, also requires
 `OPENAI_ASSISTANT_ID` in the same `.env`/`--env-file`.
 
+## Verifying the real uploader (do this before scaling up)
+
+The uploader is fully covered by offline tests, but has intentionally never
+been run against the real OpenAI API as part of this build — only you, with
+your own API key and budget, should decide when that happens. Recommended
+order, since OpenAI usage is billed:
+
+1. Confirm `.venv/Scripts/pytest -v` is fully green first.
+2. Run locally with a tiny scope to exercise the real path end-to-end at
+   near-zero cost:
+   ```bash
+   # In .env: set OPENAI_API_KEY and OPENAI_ASSISTANT_ID, leave
+   # OPENAI_VECTOR_STORE_ID empty, and set ARTICLE_LIMIT=1
+   .venv/Scripts/python main.py
+   ```
+   Check the log line `Created new OpenAI Vector Store id=...` and
+   `files embedded=1 chunks embedded=N`, then copy the printed vector store
+   id into `.env` as `OPENAI_VECTOR_STORE_ID` so the next run reuses it
+   instead of creating another one.
+3. Run again locally with the same small `ARTICLE_LIMIT` to confirm a
+   no-change second run logs `files embedded=0` (nothing re-uploaded).
+4. Only after both of those succeed, raise `ARTICLE_LIMIT` back to 50 (or
+   unset it) for a full local run, then follow `docs/deployment.md` to set
+   the three OpenAI values as Fly secrets and redeploy the scheduled Machine.
+
+Treat any failure in steps 2-3 as a stopping point to fix and re-test
+offline first (adding a case to `tests/test_openai_uploader.py` if it
+reveals a gap in the mocked coverage) rather than immediately retrying
+against the live API.
+
 ## Status
 
 Vector-store upload is implemented (`uploader/openai_store.py`) and covered
