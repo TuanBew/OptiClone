@@ -4,6 +4,18 @@ Design spec for Take-Home Task 1 (scrape → Markdown) + Task 3 (daily delta job
 DigitalOcean). Task 2 (OpenAI Vector Store upload) is explicitly out of scope for
 this build — represented only by a pluggable `Uploader` interface + `StubUploader`.
 
+> **Amendment (2026-07-09, later):** The deployment target changed from a
+> DigitalOcean Droplet to a Fly.io scheduled Machine after the Droplet
+> incurred an unexpected ~300k VND startup cost (a droplet bills for
+> continuous uptime regardless of whether the job is running). See
+> `docs/deployment.md` for the current, authoritative deployment instructions
+> — the "Locked architecture" and "DevOps" sections below describing
+> DigitalOcean are historical and superseded on this one point. No other part
+> of this design changed: the Docker image, `docker run` contract, and the
+> bind-mounted-volume-for-`state/` persistence model are unchanged, since
+> Fly Volumes serve the same role a bind-mounted host directory did on a
+> Droplet.
+
 ## Source of Truth
 
 - `OptiSigns_Take-Home_Test_Updated.docx` — the assignment, grading rubric, deliverables.

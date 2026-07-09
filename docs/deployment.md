@@ -1,36 +1,89 @@
-# Deployment: DigitalOcean Droplet + Daily Cron
+# Deployment: Fly.io Scheduled Machine
 
-1. Create a small DigitalOcean Droplet from the "Docker" marketplace image (Ubuntu + Docker pre-installed).
-2. SSH in and clone this repo:
+Fly.io's [scheduled Machines](https://fly.io/docs/machines/flyctl/fly-machine-run/)
+are a better fit for this job than a cron-on-a-VM setup: the same Machine starts
+on a daily cycle, runs the container's entrypoint to completion, and auto-stops
+when it exits — so you're billed for the few seconds/minutes the job actually
+runs per day, not for a droplet sitting idle 24/7.
+
+## One-time setup
+
+1. Install `flyctl` and log in:
    ```
-   git clone <repo-url> /root/opticlone
-   cd /root/opticlone
+   fly auth login
    ```
-3. Create `/root/opticlone/.env` from `.env.sample` (leave `OPENAI_API_KEY` blank; this build's stub uploader needs none).
-4. Build the image once:
+2. Create the app shell (no deploy yet):
    ```
-   docker build -t opticlone .
+   fly apps create opticlone-job
    ```
-5. Create the persistent state/log directories on the droplet's disk:
+3. Create a small persistent volume for `state/` (a Fly volume is 1:1 with a
+   Machine and lives on the same physical host, so this is what survives
+   between scheduled runs — the container filesystem itself is fully ephemeral,
+   same as before):
    ```
-   mkdir -p /root/opticlone/state /root/opticlone/logs
+   fly volumes create opticlone_state --app opticlone-job --region sin --size 1
    ```
-6. Add a daily cron entry (`crontab -e`):
+4. Set `OPENAI_API_KEY` as a Fly secret if you ever want to pass one (leave
+   unset for this build — the stub uploader needs none):
    ```
-   0 6 * * * cd /root/opticlone && docker run --rm --env-file .env \
-     -v /root/opticlone/state:/app/state -v /root/opticlone/logs:/app/logs opticlone \
-     >> /root/opticlone/logs/cron-$(date +\%F).log 2>&1
+   fly secrets set OPENAI_API_KEY=... --app opticlone-job
    ```
-   The bind-mounted `state/` directory is what makes delta detection work across runs — the container itself is fully ephemeral, but the manifest lives on the droplet's disk between invocations.
+5. Build and push the image (build-only — do **not** use plain `fly deploy`
+   here, see the note below):
+   ```
+   fly deploy --app opticlone-job --build-only --push
+   ```
+   This prints the pushed image reference, e.g.
+   `registry.fly.io/opticlone-job:deployment-01ABC...`.
+6. Create the scheduled Machine, mounting the volume at `/app/state`:
+   ```
+   fly machine run registry.fly.io/opticlone-job:deployment-01ABC... \
+     --app opticlone-job --region sin --schedule daily \
+     -v opticlone_state:/app/state
+   ```
+   Note: Fly's `daily` schedule is fuzzy (roughly once every ~24h from
+   creation time), not a fixed clock time like a cron entry — if you need an
+   exact time of day, that's a documented Fly limitation, not something this
+   job controls.
+
+## Updating the image after a code change
+
+**Do not run plain `fly deploy` on this app** — community reports indicate a
+plain deploy can wipe a Machine's schedule configuration. Instead:
+
+```
+fly deploy --app opticlone-job --build-only --push
+fly machine update <machine-id> --app opticlone-job \
+  --image registry.fly.io/opticlone-job:<new-deployment-tag> \
+  --schedule daily
+```
+
+Always re-pass `--schedule daily` on update so the schedule isn't silently
+dropped. Get the machine ID via `fly machine list --app opticlone-job`.
 
 ## Viewing job logs
 
-SSH into the droplet and tail the latest log:
 ```
-ssh root@<droplet-ip>
-tail -f /root/opticlone/logs/cron-$(date +%F).log
+fly logs --app opticlone-job
 ```
-Or inspect the last run's summary directly:
+
+Or use the Fly dashboard's Monitoring page for the app (`fly dashboard opticlone-job`).
+
+## Viewing the last-run artifact
+
+The Machine is normally in a stopped state between scheduled runs. Start it
+briefly to inspect the mounted state, then let it go back to sleep on its own
+schedule:
+
 ```
-cat /root/opticlone/state/last_delta.json
+fly machine start <machine-id> --app opticlone-job
+fly ssh console --app opticlone-job -C "cat /app/state/last_delta.json"
 ```
+
+## Cost note
+
+This replaces an earlier DigitalOcean Droplet design, which bills for a
+continuously-running VM regardless of whether the job is executing. A
+scheduled Fly Machine only bills for compute while actually started — for a
+job that runs for well under a minute once a day, this is close to free
+beyond the volume's small storage cost.

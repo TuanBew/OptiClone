@@ -50,9 +50,10 @@ scraper, delta logic, or `main.py`.
 
 ## Deployment & logs
 
-Runs daily via cron on a DigitalOcean Droplet — see [`docs/deployment.md`](docs/deployment.md)
-for setup and how to view job logs / the last-run artifact
-(`state/last_delta.json`).
+Runs daily as a [Fly.io scheduled Machine](https://fly.io/docs/machines/flyctl/fly-machine-run/)
+(billed only while the job is actually running, not for an idle VM) — see
+[`docs/deployment.md`](docs/deployment.md) for setup and how to view job logs /
+the last-run artifact (`state/last_delta.json`).
 
 ## Docker
 

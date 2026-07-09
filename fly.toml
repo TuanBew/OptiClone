@@ -1,0 +1,12 @@
+# Fly.io app config for reference/rebuilds. The recurring daily schedule and
+# volume mount are set up via `fly machine run`/`fly machine update` per
+# docs/deployment.md, not via `fly deploy` — see that doc for why.
+
+app = "opticlone-job"
+primary_region = "sin"
+
+[build]
+
+[mounts]
+source = "opticlone_state"
+destination = "/app/state"
