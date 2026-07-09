@@ -51,7 +51,10 @@ def classify(normalized_articles: list, manifest: dict) -> DeltaResult:
     return DeltaResult(added=added, updated=updated, skipped_count=skipped_count)
 
 
-def update_manifest_entries(manifest: dict, articles: list) -> dict:
+def update_manifest_entries(
+    manifest: dict, articles: list, file_ids: dict[int, str] | None = None
+) -> dict:
+    file_ids = file_ids or {}
     new_manifest = dict(manifest)
     for article in articles:
         key = str(article.article_id)
@@ -60,6 +63,6 @@ def update_manifest_entries(manifest: dict, articles: list) -> dict:
             "slug": article.slug,
             "content_hash": article.content_hash,
             "updated_at": article.updated_at,
-            "file_id": existing_file_id,
+            "file_id": file_ids.get(article.article_id, existing_file_id),
         }
     return new_manifest

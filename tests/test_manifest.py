@@ -73,3 +73,25 @@ def test_save_and_load_manifest_roundtrip(tmp_path):
 def test_load_manifest_missing_file_returns_empty_dict(tmp_path):
     path = str(tmp_path / "does_not_exist.json")
     assert load_manifest(path) == {}
+
+
+def test_update_manifest_entries_uses_file_ids_map_when_present():
+    manifest = {
+        "2": {"slug": "two", "content_hash": "hash2-old", "updated_at": "old", "file_id": "file_abc"},
+    }
+    articles = [make_article(2, "two", "hash2-new", updated_at="2026-02-01T00:00:00Z")]
+
+    new_manifest = update_manifest_entries(manifest, articles, file_ids={2: "file_new"})
+
+    assert new_manifest["2"]["file_id"] == "file_new"
+
+
+def test_update_manifest_entries_falls_back_to_existing_when_id_not_in_map():
+    manifest = {
+        "2": {"slug": "two", "content_hash": "hash2-old", "updated_at": "old", "file_id": "file_abc"},
+    }
+    articles = [make_article(2, "two", "hash2-new")]
+
+    new_manifest = update_manifest_entries(manifest, articles, file_ids={})
+
+    assert new_manifest["2"]["file_id"] == "file_abc"
