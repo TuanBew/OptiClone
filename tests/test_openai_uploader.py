@@ -110,4 +110,6 @@ def test_upload_updated_article_continues_if_old_file_already_gone(tmp_path):
     result = uploader.upload(files)
 
     assert result == {1: "file_new1"}
+    client.vector_stores.files.delete.assert_called_once_with("file_old1", vector_store_id="vs_existing")
+    client.files.delete.assert_called_once_with("file_old1")
     client.vector_stores.files.upload_and_poll.assert_called_once()
