@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from delta.manifest import classify, load_manifest, save_manifest, update_manifest_entries
 from scraper.markdown import normalize_article, write_markdown_file
 from scraper.zendesk import ZENDESK_ARTICLES_URL, fetch_articles
-from uploader.base import ArticleFile
+from uploader.base import ArticleFile, Uploader
+from uploader.openai_store import OpenAIVectorStoreUploader
 from uploader.stub import StubUploader
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -28,6 +29,24 @@ def get_article_limit() -> int | None:
         raise ValueError(
             f"Invalid ARTICLE_LIMIT={raw!r}: expected an integer (or an empty string for no limit)."
         ) from exc
+
+
+def build_uploader() -> Uploader:
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        return StubUploader(delta_path=DELTA_PATH)
+
+    assistant_id = os.environ.get("OPENAI_ASSISTANT_ID")
+    if not assistant_id:
+        raise ValueError(
+            "OPENAI_API_KEY is set but OPENAI_ASSISTANT_ID is missing; "
+            "set both or neither to select the real uploader."
+        )
+    return OpenAIVectorStoreUploader(
+        api_key=api_key,
+        assistant_id=assistant_id,
+        vector_store_id=os.environ.get("OPENAI_VECTOR_STORE_ID") or None,
+    )
 
 
 def run() -> int:
@@ -60,14 +79,17 @@ def run() -> int:
             path=written_paths[article.article_id],
             content_hash=article.content_hash,
             url=article.url,
+            file_id=manifest.get(str(article.article_id), {}).get("file_id"),
         )
         for article in (delta_result.added + delta_result.updated)
     ]
 
-    uploader = StubUploader(delta_path=DELTA_PATH)
-    uploader.upload(delta_files)
+    uploader = build_uploader()
+    uploaded = uploader.upload(delta_files)
 
-    new_manifest = update_manifest_entries(manifest, delta_result.added + delta_result.updated)
+    new_manifest = update_manifest_entries(
+        manifest, delta_result.added + delta_result.updated, file_ids=uploaded
+    )
     save_manifest(new_manifest, MANIFEST_PATH)
 
     logger.info(
