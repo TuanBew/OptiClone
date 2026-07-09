@@ -12,7 +12,7 @@ class StubUploader(Uploader):
     def __init__(self, delta_path: str = "state/last_delta.json"):
         self.delta_path = delta_path
 
-    def upload(self, files: list[ArticleFile]) -> None:
+    def upload(self, files: list[ArticleFile]) -> dict[int, str]:
         for file in files:
             logger.info(
                 "Would upload: %s (article_id=%s, url=%s)", file.slug, file.article_id, file.url
@@ -31,3 +31,4 @@ class StubUploader(Uploader):
         }
         with open(self.delta_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
+        return {}

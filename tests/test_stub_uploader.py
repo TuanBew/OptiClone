@@ -38,3 +38,15 @@ def test_stub_uploader_handles_empty_delta(tmp_path):
         payload = json.load(f)
     assert payload["uploaded_count"] == 0
     assert payload["uploaded_slugs"] == []
+
+
+def test_stub_uploader_upload_returns_empty_dict(tmp_path):
+    delta_path = str(tmp_path / "state" / "last_delta.json")
+    uploader = StubUploader(delta_path=delta_path)
+    files = [
+        ArticleFile(article_id=1, slug="one", path="articles/one.md", content_hash="h1", url="https://x/one"),
+    ]
+
+    result = uploader.upload(files)
+
+    assert result == {}
