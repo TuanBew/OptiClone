@@ -8,6 +8,9 @@ def fetch_articles(limit: int | None = None, session: requests.Session | None = 
 
     Pages through `next_page` until exhausted or `limit` is reached.
     """
+    if limit is not None and limit <= 0:
+        return []
+
     http = session or requests.Session()
     articles: list[dict] = []
     url = f"{ZENDESK_ARTICLES_URL}?per_page=100&page=1"

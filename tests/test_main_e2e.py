@@ -1,5 +1,6 @@
 import json
 
+import pytest
 import responses
 
 import main as main_module
@@ -67,6 +68,22 @@ def test_first_run_added_second_run_all_skipped(tmp_path, monkeypatch):
     with open(delta_path, encoding="utf-8") as f:
         second_delta = json.load(f)
     assert second_delta["uploaded_count"] == 0
+
+
+def test_get_article_limit_defaults_to_50(monkeypatch):
+    monkeypatch.delenv("ARTICLE_LIMIT", raising=False)
+    assert main_module.get_article_limit() == 50
+
+
+def test_get_article_limit_empty_string_means_no_limit(monkeypatch):
+    monkeypatch.setenv("ARTICLE_LIMIT", "")
+    assert main_module.get_article_limit() is None
+
+
+def test_get_article_limit_raises_clear_error_for_non_numeric_value(monkeypatch):
+    monkeypatch.setenv("ARTICLE_LIMIT", "abc")
+    with pytest.raises(ValueError, match="ARTICLE_LIMIT"):
+        main_module.get_article_limit()
 
 
 @responses.activate

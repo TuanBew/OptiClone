@@ -12,4 +12,7 @@ COPY uploader/ uploader/
 
 RUN mkdir -p state logs articles
 
+RUN useradd -r -s /bin/false appuser && chown -R appuser:appuser /app
+USER appuser
+
 ENTRYPOINT ["python", "main.py"]

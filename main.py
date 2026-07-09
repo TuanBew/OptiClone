@@ -20,9 +20,14 @@ DELTA_PATH = "state/last_delta.json"
 
 def get_article_limit() -> int | None:
     raw = os.environ.get("ARTICLE_LIMIT", "50")
-    if raw is None or raw == "":
+    if raw == "":
         return None
-    return int(raw)
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid ARTICLE_LIMIT={raw!r}: expected an integer (or an empty string for no limit)."
+        ) from exc
 
 
 def run() -> int:
@@ -36,10 +41,11 @@ def run() -> int:
         return 1
 
     normalized = []
+    written_paths: dict[int, str] = {}
     for raw in raw_articles:
         try:
             article = normalize_article(raw)
-            write_markdown_file(article, ARTICLES_DIR)
+            written_paths[article.article_id] = write_markdown_file(article, ARTICLES_DIR)
             normalized.append(article)
         except Exception:
             logger.warning("Failed to normalize article id=%s", raw.get("id"), exc_info=True)
@@ -51,7 +57,7 @@ def run() -> int:
         ArticleFile(
             article_id=article.article_id,
             slug=article.slug,
-            path=os.path.join(ARTICLES_DIR, f"{article.slug}.md"),
+            path=written_paths[article.article_id],
             content_hash=article.content_hash,
             url=article.url,
         )

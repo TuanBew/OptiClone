@@ -13,6 +13,6 @@ class ArticleFile:
 
 class Uploader(ABC):
     @abstractmethod
-    def upload(self, files: list) -> None:
+    def upload(self, files: list[ArticleFile]) -> None:
         """Upload the given delta of ArticleFile entries."""
         raise NotImplementedError

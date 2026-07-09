@@ -34,3 +34,11 @@ def test_fetch_articles_respects_limit_without_fetching_next_page():
 
     assert len(articles) == 1
     assert articles[0]["id"] == 1
+
+
+def test_fetch_articles_with_zero_limit_returns_empty_without_request():
+    # No responses registered: any HTTP call would raise ConnectionError,
+    # proving the early return happens before pagination starts.
+    articles = fetch_articles(limit=0)
+
+    assert articles == []
