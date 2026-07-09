@@ -92,7 +92,17 @@ your own API key and budget, should decide when that happens. Recommended
 order, since OpenAI usage is billed:
 
 1. Confirm `.venv/Scripts/pytest -v` is fully green first.
-2. Run locally with a tiny scope to exercise the real path end-to-end at
+2. **Back up and clear local state first.** This repo's `state/` directory is
+   gitignored but persists across runs on your machine, and if you've scraped
+   articles locally before, `state/manifest.json` already tracks them. Running
+   the tiny-scope test below without clearing it will likely fetch an article
+   that's already recorded with an unchanged hash, get classified `skipped`,
+   and never reach the uploader at all — a silent no-op on your one live
+   attempt. Move the existing state aside first:
+   ```bash
+   mv state state_backup   # restore later with: mv state_backup state
+   ```
+3. Run locally with a tiny scope to exercise the real path end-to-end at
    near-zero cost:
    ```bash
    # In .env: set OPENAI_API_KEY and OPENAI_ASSISTANT_ID, leave
@@ -103,13 +113,18 @@ order, since OpenAI usage is billed:
    `files embedded=1 chunks embedded=N`, then copy the printed vector store
    id into `.env` as `OPENAI_VECTOR_STORE_ID` so the next run reuses it
    instead of creating another one.
-3. Run again locally with the same small `ARTICLE_LIMIT` to confirm a
-   no-change second run logs `files embedded=0` (nothing re-uploaded).
-4. Only after both of those succeed, raise `ARTICLE_LIMIT` back to 50 (or
-   unset it) for a full local run, then follow `docs/deployment.md` to set
-   the three OpenAI values as Fly secrets and redeploy the scheduled Machine.
+4. Run again locally with the same small `ARTICLE_LIMIT` to confirm a
+   no-change second run uploads nothing. With an empty delta,
+   `OpenAIVectorStoreUploader.upload()` returns immediately without logging
+   a `files embedded=...` line at all — the signal to look for instead is
+   `main.py`'s own summary line: `Delta complete: added=0 updated=0 skipped=1`.
+5. Only after both of those succeed, restore your original `state/`
+   (`mv state_backup state`) or start fresh, then raise `ARTICLE_LIMIT` back
+   to 50 (or unset it) for a full local run, and follow `docs/deployment.md`
+   to set the three OpenAI values as Fly secrets and redeploy the scheduled
+   Machine.
 
-Treat any failure in steps 2-3 as a stopping point to fix and re-test
+Treat any failure in steps 3-4 as a stopping point to fix and re-test
 offline first (adding a case to `tests/test_openai_uploader.py` if it
 reveals a gap in the mocked coverage) rather than immediately retrying
 against the live API.
