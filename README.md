@@ -98,7 +98,8 @@ order, since OpenAI usage is billed:
    the tiny-scope test below without clearing it will likely fetch an article
    that's already recorded with an unchanged hash, get classified `skipped`,
    and never reach the uploader at all — a silent no-op on your one live
-   attempt. Move the existing state aside first:
+   attempt. Move the existing state aside first
+   (skip this step if you don't already have a local state/ directory):
    ```bash
    mv state state_backup   # restore later with: mv state_backup state
    ```
@@ -118,11 +119,17 @@ order, since OpenAI usage is billed:
    `OpenAIVectorStoreUploader.upload()` returns immediately without logging
    a `files embedded=...` line at all — the signal to look for instead is
    `main.py`'s own summary line: `Delta complete: added=0 updated=0 skipped=1`.
-5. Only after both of those succeed, restore your original `state/`
-   (`mv state_backup state`) or start fresh, then raise `ARTICLE_LIMIT` back
-   to 50 (or unset it) for a full local run, and follow `docs/deployment.md`
-   to set the three OpenAI values as Fly secrets and redeploy the scheduled
-   Machine.
+5. Do **not** restore the `state_backup` you made in Step 2. The manifest now
+   on disk already has a real `file_id` for the one article you just tested,
+   and leaving it in place means the next run correctly treats that article
+   as `skipped` (no wasted duplicate re-upload) while every other article —
+   never actually uploaded to OpenAI before this point — gets embedded for
+   real for the first time. (`state_backup` exists only as a rollback if the
+   tiny test needs to be abandoned and retried from a clean slate:
+   `rm -rf state && mv state_backup state` restores it for that case.) Keep
+   `OPENAI_API_KEY` set, raise `ARTICLE_LIMIT` back to 50 (or unset it) for
+   the full local run, then follow `docs/deployment.md` to set the three
+   OpenAI values as Fly secrets and redeploy the scheduled Machine.
 
 Treat any failure in steps 3-4 as a stopping point to fix and re-test
 offline first (adding a case to `tests/test_openai_uploader.py` if it
