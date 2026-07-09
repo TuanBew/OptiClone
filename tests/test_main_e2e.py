@@ -7,6 +7,16 @@ import main as main_module
 from uploader.openai_store import OpenAIVectorStoreUploader
 from uploader.stub import StubUploader
 
+
+class RecordingUploader:
+    def __init__(self):
+        self.received_files = []
+
+    def upload(self, files):
+        self.received_files.extend(files)
+        return {}
+
+
 ARTICLES_PAGE_1 = {
     "articles": [
         {
@@ -155,3 +165,41 @@ def test_updated_article_preserves_existing_file_id_when_using_stub(tmp_path, mo
     with open(manifest_path, encoding="utf-8") as f:
         manifest_after = json.load(f)
     assert manifest_after["1"]["file_id"] == "file_existing123"
+
+
+@responses.activate
+def test_run_populates_file_id_for_updated_and_none_for_added(tmp_path, monkeypatch):
+    responses.add(responses.GET, main_module.ZENDESK_ARTICLES_URL, json=ARTICLES_PAGE_1, status=200)
+
+    articles_dir = tmp_path / "articles"
+    manifest_path = tmp_path / "state" / "manifest.json"
+    delta_path = tmp_path / "state" / "last_delta.json"
+
+    monkeypatch.setattr(main_module, "ARTICLES_DIR", str(articles_dir))
+    monkeypatch.setattr(main_module, "MANIFEST_PATH", str(manifest_path))
+    monkeypatch.setattr(main_module, "DELTA_PATH", str(delta_path))
+    monkeypatch.setenv("ARTICLE_LIMIT", "10")
+
+    recorder = RecordingUploader()
+    monkeypatch.setattr(main_module, "build_uploader", lambda: recorder)
+
+    assert main_module.run() == 0
+    assert len(recorder.received_files) == 1
+    assert recorder.received_files[0].article_id == 1
+    assert recorder.received_files[0].file_id is None
+
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest = json.load(f)
+    manifest["1"]["file_id"] = "file_existing123"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f)
+
+    changed_page = json.loads(json.dumps(ARTICLES_PAGE_1))
+    changed_page["articles"][0]["body"] = "<h1>Article One</h1><p>Changed body text.</p>"
+    responses.add(responses.GET, main_module.ZENDESK_ARTICLES_URL, json=changed_page, status=200)
+
+    recorder.received_files.clear()
+    assert main_module.run() == 0
+    assert len(recorder.received_files) == 1
+    assert recorder.received_files[0].article_id == 1
+    assert recorder.received_files[0].file_id == "file_existing123"
