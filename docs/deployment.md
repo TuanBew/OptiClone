@@ -32,9 +32,9 @@ runs per day, not for a droplet sitting idle 24/7.
    fly secrets set OPENAI_VECTOR_STORE_ID=vs_... --app opticlone-job
    ```
    `OPENAI_VECTOR_STORE_ID` should be set only *after* a first successful run
-   has created one and logged its id (see the README's "Verifying the real
-   uploader" section) — leaving it unset on the very first run is expected
-   and correct; the uploader creates the store itself.
+   has created one and logged its id (see "Verifying the real uploader"
+   below) — leaving it unset on the very first run is expected and correct;
+   the uploader creates the store itself.
 5. Build and push the image (build-only — do **not** use plain `fly deploy`
    here, see the note below):
    ```
@@ -94,3 +94,55 @@ continuously-running VM regardless of whether the job is executing. A
 scheduled Fly Machine only bills for compute while actually started — for a
 job that runs for well under a minute once a day, this is close to free
 beyond the volume's small storage cost.
+
+## Verifying the real uploader (do this before scaling up)
+
+The uploader is fully covered by offline tests, but should be run against
+the real OpenAI API deliberately, not incidentally — only you, with your own
+API key and budget, should decide when that happens. Recommended order,
+since OpenAI usage is billed:
+
+1. Confirm `.venv/Scripts/pytest -v` is fully green first.
+2. **Back up and clear local state first.** `state/` is gitignored but
+   persists across runs on your machine, and if you've scraped articles
+   locally before, `state/manifest.json` already tracks them. Running the
+   tiny-scope test below without clearing it will likely fetch an article
+   that's already recorded with an unchanged hash, get classified `skipped`,
+   and never reach the uploader at all — a silent no-op on your one live
+   attempt. Move the existing state aside first (skip this step if you don't
+   already have a local `state/` directory):
+   ```bash
+   mv state state_backup   # restore later with: mv state_backup state
+   ```
+3. Run locally with a tiny scope to exercise the real path end-to-end at
+   near-zero cost:
+   ```bash
+   # In .env: set OPENAI_API_KEY and OPENAI_ASSISTANT_ID, leave
+   # OPENAI_VECTOR_STORE_ID empty, and set ARTICLE_LIMIT=1
+   .venv/Scripts/python main.py
+   ```
+   Check the log line `Created new OpenAI Vector Store id=...` and
+   `files embedded=1 chunks embedded=N`, then copy the printed vector store
+   id into `.env` as `OPENAI_VECTOR_STORE_ID` so the next run reuses it
+   instead of creating another one.
+4. Run again locally with the same small `ARTICLE_LIMIT` to confirm a
+   no-change second run uploads nothing. With an empty delta,
+   `OpenAIVectorStoreUploader.upload()` returns immediately without logging
+   a `files embedded=...` line at all — the signal to look for instead is
+   `main.py`'s own summary line: `Delta complete: added=0 updated=0 skipped=1`.
+5. Do **not** restore the `state_backup` you made in Step 2. The manifest now
+   on disk already has a real `file_id` for the one article you just tested,
+   and leaving it in place means the next run correctly treats that article
+   as `skipped` (no wasted duplicate re-upload) while every other article —
+   never actually uploaded to OpenAI before this point — gets embedded for
+   real for the first time. (`state_backup` exists only as a rollback if the
+   tiny test needs to be abandoned and retried from a clean slate:
+   `rm -rf state && mv state_backup state` restores it for that case.) Keep
+   `OPENAI_API_KEY` set, raise `ARTICLE_LIMIT` back to 50 (or unset it) for
+   the full local run, then set the three OpenAI values as Fly secrets
+   (Step 4 above) and redeploy the scheduled Machine.
+
+Treat any failure in steps 3-4 as a stopping point to fix and re-test
+offline first (adding a case to `tests/test_openai_uploader.py` if it
+reveals a gap in the mocked coverage) rather than immediately retrying
+against the live API.
