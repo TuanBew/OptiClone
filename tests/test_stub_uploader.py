@@ -40,13 +40,17 @@ def test_stub_uploader_handles_empty_delta(tmp_path):
     assert payload["uploaded_slugs"] == []
 
 
-def test_stub_uploader_upload_returns_empty_dict(tmp_path):
+def test_stub_uploader_upload_returns_file_id_passthrough_map(tmp_path):
     delta_path = str(tmp_path / "state" / "last_delta.json")
     uploader = StubUploader(delta_path=delta_path)
     files = [
         ArticleFile(article_id=1, slug="one", path="articles/one.md", content_hash="h1", url="https://x/one"),
+        ArticleFile(
+            article_id=2, slug="two", path="articles/two.md", content_hash="h2", url="https://x/two",
+            file_id="existing_abc",
+        ),
     ]
 
     result = uploader.upload(files)
 
-    assert result == {}
+    assert result == {1: None, 2: "existing_abc"}

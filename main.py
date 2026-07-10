@@ -87,9 +87,12 @@ def run() -> int:
     uploader = build_uploader()
     uploaded = uploader.upload(delta_files)
 
-    new_manifest = update_manifest_entries(
-        manifest, delta_result.added + delta_result.updated, file_ids=uploaded
-    )
+    processed_articles = [
+        article
+        for article in (delta_result.added + delta_result.updated)
+        if article.article_id in uploaded
+    ]
+    new_manifest = update_manifest_entries(manifest, processed_articles, file_ids=uploaded)
     save_manifest(new_manifest, MANIFEST_PATH)
 
     logger.info(

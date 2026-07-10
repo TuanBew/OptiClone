@@ -31,4 +31,4 @@ class StubUploader(Uploader):
         }
         with open(self.delta_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
-        return {}
+        return {file.article_id: file.file_id for file in files}

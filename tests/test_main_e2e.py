@@ -14,7 +14,19 @@ class RecordingUploader:
 
     def upload(self, files):
         self.received_files.extend(files)
-        return {}
+        return {f.article_id: f.file_id for f in files}
+
+
+class PartialFailureUploader:
+    def __init__(self, fail_article_ids):
+        self.fail_article_ids = set(fail_article_ids)
+
+    def upload(self, files):
+        return {
+            f.article_id: (f.file_id or "new_file_id")
+            for f in files
+            if f.article_id not in self.fail_article_ids
+        }
 
 
 ARTICLES_PAGE_1 = {
@@ -203,3 +215,45 @@ def test_run_populates_file_id_for_updated_and_none_for_added(tmp_path, monkeypa
     assert len(recorder.received_files) == 1
     assert recorder.received_files[0].article_id == 1
     assert recorder.received_files[0].file_id == "file_existing123"
+
+
+@responses.activate
+def test_failed_update_does_not_roll_manifest_hash_forward_and_is_retried(tmp_path, monkeypatch):
+    responses.add(responses.GET, main_module.ZENDESK_ARTICLES_URL, json=ARTICLES_PAGE_1, status=200)
+
+    articles_dir = tmp_path / "articles"
+    manifest_path = tmp_path / "state" / "manifest.json"
+    delta_path = tmp_path / "state" / "last_delta.json"
+    monkeypatch.setattr(main_module, "ARTICLES_DIR", str(articles_dir))
+    monkeypatch.setattr(main_module, "MANIFEST_PATH", str(manifest_path))
+    monkeypatch.setattr(main_module, "DELTA_PATH", str(delta_path))
+    monkeypatch.setenv("ARTICLE_LIMIT", "10")
+
+    succeeding_uploader = PartialFailureUploader(fail_article_ids=set())
+    monkeypatch.setattr(main_module, "build_uploader", lambda: succeeding_uploader)
+    assert main_module.run() == 0
+
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest_after_first_run = json.load(f)
+    original_hash = manifest_after_first_run["1"]["content_hash"]
+
+    changed_page = json.loads(json.dumps(ARTICLES_PAGE_1))
+    changed_page["articles"][0]["body"] = "<h1>Article One</h1><p>Changed body text.</p>"
+    responses.add(responses.GET, main_module.ZENDESK_ARTICLES_URL, json=changed_page, status=200)
+
+    failing_uploader = PartialFailureUploader(fail_article_ids={1})
+    monkeypatch.setattr(main_module, "build_uploader", lambda: failing_uploader)
+    assert main_module.run() == 0
+
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest_after_failed_update = json.load(f)
+    assert manifest_after_failed_update["1"]["content_hash"] == original_hash
+
+    responses.add(responses.GET, main_module.ZENDESK_ARTICLES_URL, json=changed_page, status=200)
+    succeeding_uploader_2 = PartialFailureUploader(fail_article_ids=set())
+    monkeypatch.setattr(main_module, "build_uploader", lambda: succeeding_uploader_2)
+    assert main_module.run() == 0
+
+    with open(manifest_path, encoding="utf-8") as f:
+        manifest_final = json.load(f)
+    assert manifest_final["1"]["content_hash"] != original_hash
