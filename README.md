@@ -143,7 +143,11 @@ by an offline, mocked-client test suite (`tests/test_openai_uploader.py`) —
 no test ever calls the real OpenAI API. The committed `articles/` snapshot
 demonstrates scrape/clean quality independent of the uploader.
 
-Sanity-check screenshot (Playground, asking the Opticlone assistant "How do
-I add a YouTube video?", showing cited `Article URL:` lines):
+The real uploader has been run against the live OpenAI API following the
+staged rollout above: all 50 articles are embedded in Vector Store
+`vs_6a505dc7dae081918183a892c3936461`, attached to the "Opticlone" assistant.
 
-`[screenshot placeholder — to be added after the first live run]`
+Sanity-check screenshot (Playground, asking the Opticlone assistant "How do
+I add a YouTube video?"):
+
+![Opticlone assistant answering "How do I add a YouTube video?" in the OpenAI Playground, with File Search enabled against the OptiClone Articles vector store](docs/assistant-playground-screenshot.png)
